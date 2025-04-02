@@ -33,7 +33,6 @@ class OpenAIService {
       throw error;
     }
   }
-
   public async callOpenAI(query: string, apiKey: string): Promise<any> {
     if (!this.client) {
       this.client = new OpenAI({
@@ -47,20 +46,53 @@ class OpenAIService {
         response_format: { type: "json_object" },
         messages: [
           {
+            role: "system",
+            content: `Tu es un assistant spécialisé dans l'analyse de lieux touristiques ou historiques. 
+            Tu dois toujours répondre en français et dans un format JSON spécifique avec les champs suivants:
+            {
+              "introduction": "Une introduction détaillée du lieu, son histoire, pourquoi il est connu et ce qui s'y est passé",
+              "dateCreation": "La date de création du lieu (laisser vide si inconnue)",
+              "lieuxAVisiter": [
+                {
+                  "nom": "Nom du premier lieu à visiter",
+                  "adresse": "Adresse ou localisation précise",
+                  "contexte": "Description de ce qu'on peut y faire, voir ou expérimenter",
+                  "payant": "Oui/Non/Prix (laisser vide si inconnu)"
+                },
+                {
+                  "nom": "Nom du deuxième lieu",
+                  "adresse": "Adresse ou localisation précise",
+                  "contexte": "Description de ce qu'on peut y faire, voir ou expérimenter",
+                  "payant": "Oui/Non/Prix (laisser vide si inconnu)"
+                }
+                ... et ainsi de suite pour tous les lieux pertinents
+              ]
+            }`
+          },
+          {
             role: "user",
-            content: "Tu es un assistant qui analyse des informations et répond en format JSON et en français. Analyse l'information suivante: " + query
+            content: query
           }
         ],
         temperature: 0.4
       });
   
+
+      if (response.choices[0].message.content) {
+        try {
+          return JSON.parse(response.choices[0].message.content);
+        } catch (e) {
+          console.error("Erreur lors du parsing JSON:", e);
+          return response.choices[0].message.content;
+        }
+      }
+      
       return response.choices[0].message;
     } catch (error) {
       console.error("OpenAI error:", error);
       throw error;
     }
   }
-
 }
 
 export default OpenAIService;
