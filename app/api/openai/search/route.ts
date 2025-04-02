@@ -4,10 +4,10 @@ import OpenAIService from "@/services/openaiService";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { text } = body;
+    const { addresses } = body;
 
-    if (!text) {
-      return NextResponse.json({ error: "Text is required" }, { status: 400 });
+    if (!addresses || !Array.isArray(addresses) || addresses.length === 0) {
+      return NextResponse.json({ error: "Addresses array is required" }, { status: 400 });
     }
 
     const OPEN_API_KEY = process.env.OPEN_API_KEY;
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     }
 
     const openAIService = OpenAIService.getInstance();
-    const result = await openAIService.callOpenAI(text, OPEN_API_KEY);
+    const result = await openAIService.callOpenAI(addresses, OPEN_API_KEY);
 
     return NextResponse.json(result);
   } catch (error) {

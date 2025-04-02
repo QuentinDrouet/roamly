@@ -1,0 +1,22 @@
+sequenceDiagram
+    participant User as User
+    participant UI as User Interface
+    participant Service as OpenAIService
+    participant APIRoute as API Route Next.js
+    participant OpenAI as OpenAI API
+    participant DB as Supabase DB
+
+    User->>UI: Enters a location query
+    UI->>Service: searchWeb(query)
+    Service->>APIRoute: POST /api/openai/search
+    
+    APIRoute->>DB: Verify permissions (optional)
+    DB-->>APIRoute: Status OK
+    
+    APIRoute->>OpenAI: Call API chat.completions.create
+    Note right of OpenAI: Query analysis
+    OpenAI-->>APIRoute: Responds with structured JSON
+    
+    APIRoute-->>Service: Returns JSON result
+    Service-->>UI: Transmits parsed data
+    UI-->>User: Displays location information

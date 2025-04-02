@@ -1,6 +1,6 @@
-// app/page.tsx
 'use client';
-
+import { createClient } from "@/utils/supabase/server"
+import AuthActions from "@/components/common/AuthActions"
 import React from 'react';
 import dynamic from 'next/dynamic';
 import { Loader2 } from 'lucide-react';
@@ -21,9 +21,16 @@ const MapComponent = dynamic(() => import('@/components/common/MapComponent'), {
   ssr: false, // Important: don't render on the server
 });
 
-export default function HomePage() {
+
+export default async function HomePage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
   return (
     <main className="w-screen h-screen overflow-hidden">
+      <div className="self-start justify-self-end">
+        <AuthActions user={user} />
+      </div>
       <MapComponent />
     </main>
   );

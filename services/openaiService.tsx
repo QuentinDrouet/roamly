@@ -13,14 +13,14 @@ class OpenAIService {
     return this.instance;
   }
 
-  public async searchWeb(query: string): Promise<any> {
+  public async searchWeb(queries: string[]): Promise<any> {
     try {
       const response = await fetch('/api/openai/search', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ text: query }),
+        body: JSON.stringify({ addresses: queries }),
       });
 
       if (!response.ok) {
@@ -33,7 +33,8 @@ class OpenAIService {
       throw error;
     }
   }
-  public async callOpenAI(query: string, apiKey: string): Promise<any> {
+
+  public async callOpenAI(addresses: string[], apiKey: string): Promise<any> {
     if (!this.client) {
       this.client = new OpenAI({
         apiKey: apiKey
@@ -41,48 +42,62 @@ class OpenAIService {
     }
   
     try {
+      // Prepare the query to include all addresses
+      const addressListText = addresses.map(addr => `- ${addr}`).join('\n');
+      
       const response = await this.client.chat.completions.create({
         model: "gpt-4o-mini",
         response_format: { type: "json_object" },
         messages: [
           {
             role: "system",
-            content: `Tu es un assistant spécialisé dans l'analyse de lieux touristiques ou historiques. 
-            Tu dois toujours répondre en français et dans un format JSON spécifique avec les champs suivants:
+            content: `You are an assistant specialized in analyzing tourist or historical places.
+            You will receive a list of addresses or places. For EACH place in the list, you must produce an analysis.
+            You must always respond in English and in a specific JSON format like this:
             {
-              "introduction": "Une introduction détaillée du lieu, son histoire, pourquoi il est connu et ce qui s'y est passé",
-              "dateCreation": "La date de création du lieu (laisser vide si inconnue)",
-              "lieuxAVisiter": [
+              "results": [
                 {
-                  "nom": "Nom du premier lieu à visiter",
-                  "adresse": "Adresse ou localisation précise",
-                  "contexte": "Description de ce qu'on peut y faire, voir ou expérimenter",
-                  "payant": "Oui/Non/Prix (laisser vide si inconnu)"
+                  "address": "The original address of the analyzed place",
+                  "introduction": "A detailed introduction of the place, its history, why it's known and what happened there",
+                  "creationDate": "The creation date of the place (leave empty if unknown)",
+                  "placesToVisit": [
+                    {
+                      "name": "Name of the first place to visit",
+                      "address": "Precise address or location",
+                      "context": "Description of what can be done, seen or experienced there",
+                      "paid": "Yes/No/Price (leave empty if unknown)"
+                    },
+                    {
+                      "name": "Name of the second place",
+                      "address": "Precise address or location",
+                      "context": "Description of what can be done, seen or experienced there",
+                      "paid": "Yes/No/Price (leave empty if unknown)"
+                    }
+                  ]
                 },
                 {
-                  "nom": "Nom du deuxième lieu",
-                  "adresse": "Adresse ou localisation précise",
-                  "contexte": "Description de ce qu'on peut y faire, voir ou expérimenter",
-                  "payant": "Oui/Non/Prix (laisser vide si inconnu)"
+                  "address": "The original address of the second analyzed place",
+                  "introduction": "...",
+                  "creationDate": "...",
+                  "placesToVisit": [...]
                 }
-                ... et ainsi de suite pour tous les lieux pertinents
+                ... and so on for each address/place in the list
               ]
             }`
           },
           {
             role: "user",
-            content: query
+            content: `Here is the list of addresses to analyze:\n${addressListText}`
           }
         ],
         temperature: 0.4
       });
   
-
       if (response.choices[0].message.content) {
         try {
           return JSON.parse(response.choices[0].message.content);
         } catch (e) {
-          console.error("Erreur lors du parsing JSON:", e);
+          console.error("Error parsing JSON:", e);
           return response.choices[0].message.content;
         }
       }
