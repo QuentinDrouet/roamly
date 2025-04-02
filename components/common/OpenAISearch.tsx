@@ -6,7 +6,6 @@ import OpenAIService from "@/services/openaiService";
 export default function OpenAISearch() {
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [query, setQuery] = useState("");
   const [addresses, setAddresses] = useState<string[]>([]);
   const [currentAddress, setCurrentAddress] = useState("");
   const [error, setError] = useState("");
@@ -34,8 +33,19 @@ export default function OpenAISearch() {
     setLoading(true);
 
     try {
-      const openAIService = OpenAIService.getInstance();
-      const data = await openAIService.searchWeb(addresses);
+      const response = await fetch('/api/openai/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ addresses }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error: ${response.status}`);
+      }
+
+      const data = await response.json();
       setResult(data);
     } catch (error) {
       console.error("Error:", error);
@@ -50,6 +60,7 @@ export default function OpenAISearch() {
       addAddress();
     }
   };
+
 
   return (
     <div className="w-full max-w-2xl mx-auto p-4">
