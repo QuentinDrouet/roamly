@@ -1,6 +1,12 @@
 import OpenAIService from "../../services/openaiService";
 import OpenAI from "openai";
 
+
+// test github action 
+
+
+
+// Mocking the OpenAI library test mock 
 jest.mock("openai", () => {
   return jest.fn().mockImplementation(() => {
     return {
