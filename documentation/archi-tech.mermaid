@@ -1,0 +1,36 @@
+flowchart TB
+    subgraph "Frontend - Next.js"
+        Client["Client Browser"]
+        Pages["Pages (.tsx)"]
+        Components["Components"]
+        APIRoutes["API Routes"]
+        subgraph "State & Data Fetching"
+            Hooks["React Hooks"]
+        end
+    end
+
+    subgraph "Backend Services"
+        SupabaseAuth["Supabase Auth"]
+        SupabaseDB["Supabase Database"]
+        OpenAIAPI["OpenAI API"]
+    end
+
+    subgraph "DevOps & Testing"
+        Jest["Unit Tests (Jest)"]
+        GitHubActions["GitHub Actions CI"]
+        Vercel["Vercel Deployment"]
+    end
+
+    Client --> Pages
+    Pages --> Components
+    Components --> Hooks
+    Hooks --> APIRoutes
+    APIRoutes --> SupabaseDB
+    APIRoutes --> OpenAIAPI
+    APIRoutes --> SupabaseAuth
+
+    Jest -.-> Components
+    Jest -.-> Hooks
+    Jest -.-> APIRoutes
+    GitHubActions -.-> Jest
+    GitHubActions -.-> Vercel
