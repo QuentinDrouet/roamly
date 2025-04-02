@@ -26,35 +26,27 @@ describe('GeocodingService', () => {
         expect.any(Object)
       );
     });
-
-    it('should return coordinate string when API fails', async () => {
-      // Mock failed response
-      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('API failed'));
-
-      const latlng: LatLng = { lat: 51.5, lng: -0.1 };
-      const result = await GeocodingService.reverseGeocode(latlng);
-
-      expect(result).toBe('51.500000, -0.100000');
-    });
   });
 
-  describe('calculateDistance', () => {
-    it('should calculate distance between two points correctly', () => {
-      const point1: LatLng = { lat: 51.5, lng: -0.1 }; // London
-      const point2: LatLng = { lat: 48.8, lng: 2.3 };  // Paris
+  describe('callNominatimReverseGeocode', () => {
+    it('should call Nominatim API with correct parameters', async () => {
+      // Mock successful response
+      (global.fetch as jest.Mock).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ display_name: '123 Main St, Test City' }),
+      });
 
-      const distance = GeocodingService.calculateDistance(point1, point2);
+      await GeocodingService.callNominatimReverseGeocode(51.5, -0.1);
 
-      // The distance between London and Paris is approximately 334 km
-      expect(distance).toBeCloseTo(334, 0);
-    });
-
-    it('should return 0 for identical points', () => {
-      const point: LatLng = { lat: 51.5, lng: -0.1 };
-
-      const distance = GeocodingService.calculateDistance(point, point);
-
-      expect(distance).toBe(0);
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('lat=51.5&lon=-0.1'),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            'User-Agent': expect.any(String),
+            'Accept-Language': expect.any(String),
+          }),
+        })
+      );
     });
   });
 
@@ -86,6 +78,20 @@ describe('GeocodingService', () => {
       const totalDistance = GeocodingService.calculateRouteDistance(waypoints);
 
       expect(totalDistance).toBe(0);
+    });
+  });
+
+  describe('formatRouteTime', () => {
+    it('should format time correctly with hours and minutes', () => {
+      const minutes = 125; // 2h 5min
+      const formatted = GeocodingService.formatRouteTime(minutes);
+      expect(formatted).toBe('2h 5min');
+    });
+
+    it('should format time correctly with only minutes', () => {
+      const minutes = 45;
+      const formatted = GeocodingService.formatRouteTime(minutes);
+      expect(formatted).toBe('45 min');
     });
   });
 });

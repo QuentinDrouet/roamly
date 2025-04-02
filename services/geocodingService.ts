@@ -7,6 +7,15 @@ export interface LatLng {
 }
 
 /**
+ * Interface for waypoints
+ */
+export interface Waypoint {
+  id: string;
+  latlng: LatLng;
+  address: string;
+}
+
+/**
  * Interface for route summary information
  */
 export interface RouteSummary {
@@ -42,12 +51,18 @@ export class GeocodingService {
   }
 
   /**
-   * Client-side method to reverse geocode via our API endpoint
+   * Reverse geocode a lat/lng position to an address
+   * Using OpenStreetMap's Nominatim service
    */
   static async reverseGeocode(latlng: LatLng): Promise<string> {
     try {
       const response = await fetch(
-        `/api/geocoding/reverse?lat=${latlng.lat}&lng=${latlng.lng}`
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}&zoom=18&addressdetails=1`,
+        {
+          headers: {
+            'User-Agent': 'YourAppName/1.0 (your@email.com)', // Recommended by Nominatim
+          },
+        }
       );
 
       if (!response.ok) {
@@ -60,6 +75,50 @@ export class GeocodingService {
       console.error('Reverse geocoding error:', error);
       return `${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`;
     }
+  }
+
+  /**
+   * Calculate the distance between two points in kilometers
+   * Using the Haversine formula
+   */
+  static calculateDistance(point1: LatLng, point2: LatLng): number {
+    const R = 6371; // Earth's radius in km
+    const dLat = this.toRadians(point2.lat - point1.lat);
+    const dLng = this.toRadians(point2.lng - point1.lng);
+
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(this.toRadians(point1.lat)) * Math.cos(this.toRadians(point2.lat)) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c; // Distance in km
+
+    return distance;
+  }
+
+  /**
+   * Convert degrees to radians
+   */
+  private static toRadians(degrees: number): number {
+    return degrees * (Math.PI / 180);
+  }
+
+  /**
+   * Calculate the total distance of a route with multiple waypoints
+   */
+  static calculateRouteDistance(waypoints: Waypoint[]): number {
+    if (waypoints.length < 2) return 0;
+
+    let totalDistance = 0;
+
+    for (let i = 0; i < waypoints.length - 1; i++) {
+      const point1 = waypoints[i].latlng;
+      const point2 = waypoints[i + 1].latlng;
+      totalDistance += this.calculateDistance(point1, point2);
+    }
+
+    return totalDistance;
   }
 
   /**

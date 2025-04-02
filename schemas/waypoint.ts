@@ -1,28 +1,26 @@
-import { z } from 'zod';
+/**
+ * Interface for geographical coordinates
+ */
+export interface LatLng {
+  lat: number;
+  lng: number;
+}
 
-// Schema for geographic coordinates
-export const LatLngSchema = z.object({
-  lat: z.number(),
-  lng: z.number(),
-});
+/**
+ * Interface for waypoints
+ */
+export interface Waypoint {
+  id: string;
+  latlng: LatLng;
+  address: string;
+}
 
-export type LatLng = z.infer<typeof LatLngSchema>;
-
-// Schema for waypoints
-export const WaypointSchema = z.object({
-  id: z.string(),
-  latlng: LatLngSchema,
-  address: z.string(),
-});
-
-export type Waypoint = z.infer<typeof WaypointSchema>;
-
-// Schema for a route
-export const RouteSchema = z.object({
-  id: z.string(),
-  name: z.string().optional(),
-  waypoints: z.array(WaypointSchema),
-  createdAt: z.date().optional().default(() => new Date()),
-});
-
-export type Route = z.infer<typeof RouteSchema>;
+/**
+ * Interface for a route
+ */
+export interface Route {
+  id: string;
+  name: string;
+  waypoints: Waypoint[];
+  createdAt: Date | string;
+}
