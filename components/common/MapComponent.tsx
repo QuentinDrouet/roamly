@@ -6,8 +6,9 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet-routing-machine';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Trash2, RotateCcw, Loader2, X, Check, Info } from 'lucide-react';
+import { Trash2, RotateCcw, Loader2, X, Check, Info, Save } from 'lucide-react';
 import GeocodingService from '@/services/geocodingService';
+import { useUser } from '@/contexts/UserContext';
 
 // Define our interface for the waypoints/markers
 interface Waypoint {
@@ -59,6 +60,7 @@ const MapComponent: React.FC = () => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<{[key: string]: L.Marker}>({});
   const poiMarkersRef = useRef<L.Marker[]>([]);
+  const { user, loading } = useUser();
 
   // Custom marker icon
   const createCustomIcon = (isHovered = false, isPOI = false) => {
@@ -378,6 +380,8 @@ const MapComponent: React.FC = () => {
     console.log("All waypoints cleared");
   };
 
+
+  console.log(waypoints)
   // Reset to the last two waypoints (for creating a simple A to B route)
   const resetToSimpleRoute = () => {
     if (waypoints.length >= 2) {
@@ -563,33 +567,8 @@ const MapComponent: React.FC = () => {
 
       // Store the enhanced OpenAI response in state
       setLocationInfo(result);
+      
 
-      // Optional: Save the route as before
-      const serializedWaypoints = waypoints.map(wp => ({
-        id: wp.id,
-        latlng: {
-          lat: wp.latlng.lat,
-          lng: wp.latlng.lng
-        },
-        address: wp.address
-      }));
-
-      const saveResponse = await fetch('/api/routes/save', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          waypoints: serializedWaypoints,
-          name: `Route ${new Date().toLocaleDateString()}`
-        }),
-      });
-
-      if (!saveResponse.ok) {
-        console.warn("Route saving warning:", await saveResponse.json());
-      } else {
-        console.log("Route saved successfully:", await saveResponse.json());
-      }
     } catch (error) {
       console.error("Error processing itinerary:", error);
       alert(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -599,6 +578,61 @@ const MapComponent: React.FC = () => {
     }
   };
 
+
+  const saveResponse = async () => {
+    if (!user) {
+      alert("You need to be logged in to save the itinerary");
+      return;
+    }
+    if (!locationInfo || waypoints.length < 2) {
+      alert("You need at least 2 points and location information to save the itinerary");
+      return;
+    }
+  
+    setIsSaving(true);
+  
+    try {
+      // Préparer les waypoints pour l'API
+      const serializedWaypoints = waypoints.map(wp => ({
+        id: wp.id,
+        latlng: {
+          lat: wp.latlng.lat,
+          lng: wp.latlng.lng
+        },
+        address: wp.address
+      }));
+
+      // Envoyer les waypoints et les informations de localisation à l'API
+      const response = await fetch('/api/routes/save', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        waypoints: serializedWaypoints,
+        locationInfo: locationInfo,
+        userId: user.id,
+        name: `Itinéraire du ${new Date().toLocaleDateString()}`
+      }),
+    });
+  
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Échec de la sauvegarde de l\'itinéraire');
+      }
+  
+      const result = await response.json();
+      console.log("Itinéraire et informations enregistrés avec succès:", result);
+  
+      alert("Itinéraire et informations de lieux enregistrés avec succès!");
+    } catch (error) {
+      console.error("Erreur lors de l'enregistrement:", error);
+      alert(`Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
   return (
     <div className="relative w-full h-full flex">
       {/* Left sidebar for location information */}
@@ -684,7 +718,29 @@ const MapComponent: React.FC = () => {
             <Trash2 className="mr-2 h-4 w-4" />
             Clear All Points
           </Button>
-
+          
+          {/* Afficher le bouton uniquement si l'array n'est pas vide */}
+          {setLocationInfo && waypoints.length > 0 && (
+            <Button
+            variant="outline"
+            onClick={saveResponse}
+            className="flex items-center bg-blue-600 text-white hover:bg-blue-700 shadow-lg"
+            disabled={isLoading || isSaving || !locationInfo}
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Sauvegarde...
+              </>
+            ) : (
+              <>
+                <Save className="mr-2 h-4 w-4" />
+                Enregistrer l'itinéraire
+              </>
+            )}
+          </Button>
+          )}
+         
           <Button
             variant="outline"
             onClick={resetToSimpleRoute}
