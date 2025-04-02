@@ -1,21 +1,36 @@
-// app/api/routes/save/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import RouteService, { WaypointDTO } from "@/services/routeService";
+import RouteService, { WaypointDTO, OpenAIResponseDTO } from "@/services/routeService";
 
-interface SaveRouteRequest {
+interface SaveRouteWithInfoRequest {
   waypoints: WaypointDTO[];
+  locationInfo: OpenAIResponseDTO;
   name?: string;
+  userId?: string;
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json() as SaveRouteRequest;
-    const { waypoints, name } = body;
+    const body = await request.json() as SaveRouteWithInfoRequest;
+    const { waypoints, locationInfo, name, userId } = body;
 
     // Basic validation
     if (!waypoints || !Array.isArray(waypoints) || waypoints.length < 2) {
       return NextResponse.json({
         error: "At least 2 valid waypoints are required"
+      }, { status: 400 });
+    }
+
+    // Validate location info
+    if (!locationInfo || !locationInfo.results || !Array.isArray(locationInfo.results)) {
+      return NextResponse.json({
+        error: "Valid location information is required"
+      }, { status: 400 });
+    }
+
+    // Validate user ID
+    if (!userId) {
+      return NextResponse.json({
+        error: "User ID is required"
       }, { status: 400 });
     }
 
@@ -30,12 +45,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Call the route service to save the route
+    // Call the route service to save the route with location info
     const routeService = RouteService.getInstance();
-    const savedRoute = await routeService.saveRoute(waypoints, name);
+    const savedRoute = await routeService.saveRouteWithInfo(waypoints, locationInfo, name, userId);
 
     return NextResponse.json({
-      message: "Route saved successfully",
+      message: "Route with location information saved successfully",
       route: savedRoute
     }, { status: 201 });
   } catch (error) {
