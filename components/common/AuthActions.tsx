@@ -15,7 +15,6 @@ export default function AuthActions({ user }: { user: any }) {
   if (user) {
     return (
       <div className="flex items-center gap-2">
-        <span className="text-sm">{user.email}</span>
         <Button variant="outline" onClick={handleLogout}>Se déconnecter</Button>
       </div>
     )
