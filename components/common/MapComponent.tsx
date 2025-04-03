@@ -1,19 +1,40 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-routing-machine';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Trash2, RotateCcw, Loader2, X, Check, Info, Save } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+  Trash2,
+  RotateCcw,
+  Loader2,
+  X,
+  Check,
+  Info,
+  Save,
+  Map
+} from 'lucide-react';
 import GeocodingService from '@/services/geocodingService';
 import { useUser } from '@/contexts/UserContext';
+import RoutesModal from './RoutesModal';
+import {supabase} from "@/utils/supabase/client";
 
 // Define our interface for the waypoints/markers
 interface Waypoint {
   id: string;
   latlng: L.LatLng;
+  address: string;
+}
+
+// Define serialized waypoint for API calls
+interface SerializedWaypoint {
+  id: string;
+  latlng: {
+    lat: number;
+    lng: number;
+  };
   address: string;
 }
 
@@ -56,11 +77,17 @@ const MapComponent: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isLoadingPOIs, setIsLoadingPOIs] = useState<boolean>(false);
   const [selectedPlaceIndex, setSelectedPlaceIndex] = useState<[number, number] | null>(null); // [locationIndex, placeIndex]
+
+  // Routes modal state
+  const [isRoutesModalOpen, setIsRoutesModalOpen] = useState<boolean>(false);
+
+  // Refs to track marker and routing state
   const routingControlRef = useRef<L.Routing.Control | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<{[key: string]: L.Marker}>({});
-  const poiMarkersRef = useRef<L.Marker[]>([]);
-  const { user, loading } = useUser();
+  const poiMarkersRef = useRef<{[key: string]: L.Marker}>({});
+  const isRouteInitializedRef = useRef<boolean>(false);
+  const { user } = useUser();
 
   // Custom marker icon
   const createCustomIcon = (isHovered = false, isPOI = false) => {
@@ -178,117 +205,11 @@ const MapComponent: React.FC = () => {
     }
   }, []);
 
-  // Handle map click to add waypoints
-  useEffect(() => {
-    if (!map) return;
+  // Update the routing between waypoints - defined outside of effects to avoid recreation
+  const updateRouting = useCallback(() => {
+    if (!map || waypoints.length < 2) return;
 
-    const handleMapClick = async (e: L.LeafletMouseEvent) => {
-      // Get the clicked location
-      const { lat, lng } = e.latlng;
-      console.log(`Clicked at [${lat}, ${lng}]`);
-
-      try {
-        // Show route loading state if we already have a waypoint
-        if (waypoints.length > 0) {
-          setRouteSummary(prev => prev ? { ...prev, loading: true } : { totalDistance: 0, totalTime: 0, loading: true });
-        }
-
-        // Call the API endpoint directly
-        const response = await fetch(`/api/geocoding/reverse?lat=${lat}&lng=${lng}`);
-
-        if (!response.ok) {
-          throw new Error(`API error: ${response.status}`);
-        }
-
-        const data = await response.json();
-        const address = data.display_name || 'Unknown location';
-
-        // Add the new waypoint
-        const newWaypoint: Waypoint = {
-          id: Date.now().toString(),
-          latlng: e.latlng,
-          address,
-        };
-
-        setWaypoints(prev => [...prev, newWaypoint]);
-        console.log(`Added waypoint: ${address}`);
-      } catch (error) {
-        console.error('Error fetching address:', error);
-
-        // Add waypoint even if address lookup fails
-        const newWaypoint: Waypoint = {
-          id: Date.now().toString(),
-          latlng: e.latlng,
-          address: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
-        };
-
-        setWaypoints(prev => [...prev, newWaypoint]);
-      }
-    };
-
-    map.on('click', handleMapClick);
-
-    return () => {
-      map.off('click', handleMapClick);
-    };
-  }, [map, waypoints.length]);
-
-  // Create markers for waypoints and handle routing
-  useEffect(() => {
-    if (!map) return;
-
-    // Clear existing markers
-    map.eachLayer(layer => {
-      if (layer instanceof L.Marker) {
-        map.removeLayer(layer);
-      }
-    });
-
-    // Reset markers reference
-    markersRef.current = {};
-
-    // Add new markers for each waypoint using custom icons
-    waypoints.forEach((waypoint, index) => {
-      const isHovered = waypoint.id === hoveredMarker;
-      const marker = L.marker(waypoint.latlng, {
-        icon: createCustomIcon(isHovered),
-        title: `Point ${index + 1}`
-      })
-        .addTo(map)
-        .bindPopup(`<b>Point ${index + 1}</b><br>${waypoint.address}`);
-
-      // Store marker reference
-      markersRef.current[waypoint.id] = marker;
-    });
-
-    // Update routing if we have 2 or more waypoints
-    if (waypoints.length >= 2) {
-      updateRouting();
-    } else if (routingControlRef.current) {
-      // Remove routing if we have fewer than 2 waypoints
-      map.removeControl(routingControlRef.current);
-      routingControlRef.current = null;
-      setRouteSummary(null);
-    }
-  }, [waypoints, map]);
-
-  // Update marker appearance on hover without recalculating routes
-  useEffect(() => {
-    if (!map) return;
-
-    // Update marker icons when hover state changes
-    waypoints.forEach((waypoint) => {
-      const marker = markersRef.current[waypoint.id];
-      if (marker) {
-        const isHovered = waypoint.id === hoveredMarker;
-        marker.setIcon(createCustomIcon(isHovered));
-      }
-    });
-  }, [hoveredMarker, map]);
-
-  // Update the routing between waypoints
-  const updateRouting = () => {
-    if (!map) return;
+    console.log("Updating routing...");
 
     // Set loading state
     setRouteSummary({ totalDistance: 0, totalTime: 0, loading: true });
@@ -306,9 +227,9 @@ const MapComponent: React.FC = () => {
     try {
       routingControlRef.current = L.Routing.control({
         waypoints: routeWaypoints,
-        routeWhileDragging: true,
+        routeWhileDragging: false, // Disable to prevent auto-updates
         showAlternatives: false,
-        fitSelectedRoutes: true,
+        fitSelectedRoutes: false, // Don't auto-fit to prevent view changes
         lineOptions: {
           styles: [
             { color: '#6366F1', weight: 6, opacity: 0.6 },
@@ -317,9 +238,7 @@ const MapComponent: React.FC = () => {
           extendToWaypoints: true,
           missingRouteTolerance: 0
         },
-        createMarker: () => null, // We'll create our own markers
         addWaypoints: false,
-        draggableWaypoints: false,
         // Customize the routing container to only show summary
         plan: L.Routing.plan(routeWaypoints, {
           createMarker: function() { return null; },
@@ -350,7 +269,9 @@ const MapComponent: React.FC = () => {
           loading: false
         });
 
-        console.log("Route calculated:", totalDistance, "km,", totalHours, "h", totalMinutes, "min");
+
+        // Mark as initialized
+        isRouteInitializedRef.current = true;
       });
 
       console.log("Routing added between waypoints");
@@ -358,36 +279,290 @@ const MapComponent: React.FC = () => {
       console.error("Error creating routing:", error);
       setRouteSummary(null);
     }
+  }, [map, waypoints]);
+
+  // Initialize route only when waypoints change AND route isn't already initialized
+  useEffect(() => {
+    if (!map || waypoints.length < 2) {
+      isRouteInitializedRef.current = false;
+      return;
+    }
+
+    if (!isRouteInitializedRef.current) {
+      updateRouting();
+    }
+  }, [map, waypoints, updateRouting]);
+
+  // Load a saved route
+  const loadRoute = async (routeId: string) => {
+    setIsLoading(true);
+
+    try {
+      const session = await supabase.auth.getSession();
+
+      if (!session.data.session) {
+        console.error("Session not found");
+        setIsLoading(false);
+        return;
+      }
+
+      const response = await fetch(`/api/routes/${routeId}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.data.session.access_token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to load route: ${response.status}`);
+      }
+
+      const { route: data } = await response.json();
+
+      // Clear existing map elements
+      clearMapObjects();
+
+      // Convert serialized waypoints back to L.LatLng objects
+      const loadedWaypoints = data.waypoints.map((wp: SerializedWaypoint) => ({
+        id: wp.id,
+        latlng: L.latLng(wp.latlng.lat, wp.latlng.lng),
+        address: wp.address
+      }));
+
+      // Convert latlng in locationInfo if they exist
+      const processedLocationInfo = {
+        ...data.locationInfo,
+        results: data.locationInfo.results.map((location: any) => ({
+          ...location,
+          placesToVisit: location.placesToVisit.map((place: any) => ({
+            ...place,
+            latlng: place.latlng ? L.latLng(place.latlng.lat, place.latlng.lng) : undefined
+          }))
+        }))
+      };
+
+      // Update state with the loaded data
+      setWaypoints(loadedWaypoints);
+      setLocationInfo(processedLocationInfo);
+      isRouteInitializedRef.current = false;
+
+      // Close the modal
+      setIsRoutesModalOpen(false);
+
+      // If we have a map, fit its bounds to the loaded waypoints
+      if (map && loadedWaypoints.length > 0) {
+        const bounds = L.latLngBounds(loadedWaypoints.map(wp => wp.latlng));
+        map.fitBounds(bounds, { padding: [50, 50] });
+      }
+    } catch (error) {
+      console.error("Error loading route:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  // Clear all map objects (markers, POIs, routing)
+  const clearMapObjects = useCallback(() => {
+    if (!map) return;
+
+    // Clear all waypoint markers
+    Object.values(markersRef.current).forEach(marker => {
+      if (map.hasLayer(marker)) {
+        map.removeLayer(marker);
+      }
+    });
+
+    // Clear all POI markers
+    Object.values(poiMarkersRef.current).forEach(marker => {
+      if (map.hasLayer(marker)) {
+        map.removeLayer(marker);
+      }
+    });
+
+    // Remove routing
+    if (routingControlRef.current) {
+      map.removeControl(routingControlRef.current);
+      routingControlRef.current = null;
+    }
+
+    // Reset refs
+    markersRef.current = {};
+    poiMarkersRef.current = {};
+    isRouteInitializedRef.current = false;
+  }, [map]);
+
+  // Handle map click to add waypoints
+  useEffect(() => {
+    if (!map) return;
+
+    const handleMapClick = async (e: L.LeafletMouseEvent) => {
+      // Get the clicked location
+      const { lat, lng } = e.latlng;
+
+      try {
+        // Show route loading state if we already have a waypoint
+        if (waypoints.length > 0) {
+          setRouteSummary(prev => prev ? { ...prev, loading: true } : { totalDistance: 0, totalTime: 0, loading: true });
+        }
+
+        // Call the API endpoint directly
+        const response = await fetch(`/api/geocoding/reverse?lat=${lat}&lng=${lng}`);
+
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const address = data.display_name || 'Unknown location';
+
+        // Add the new waypoint
+        const newWaypoint: Waypoint = {
+          id: Date.now().toString(),
+          latlng: e.latlng,
+          address,
+        };
+
+        setWaypoints(prev => [...prev, newWaypoint]);
+        // Mark route as needing update when waypoints change
+        isRouteInitializedRef.current = false;
+      } catch (error) {
+        console.error('Error fetching address:', error);
+
+        // Add waypoint even if address lookup fails
+        const newWaypoint: Waypoint = {
+          id: Date.now().toString(),
+          latlng: e.latlng,
+          address: `${lat.toFixed(6)}, ${lng.toFixed(6)}`,
+        };
+
+        setWaypoints(prev => [...prev, newWaypoint]);
+        // Mark route as needing update when waypoints change
+        isRouteInitializedRef.current = false;
+      }
+    };
+
+    map.on('click', handleMapClick);
+
+    return () => {
+      map.off('click', handleMapClick);
+    };
+  }, [map, waypoints.length]);
+
+  // Separate effect for updating waypoint markers
+  useEffect(() => {
+    if (!map || !waypoints.length) return;
+
+    console.log("Updating waypoint markers...");
+
+    // Clear existing waypoint markers
+    Object.values(markersRef.current).forEach(marker => {
+      if (map.hasLayer(marker)) {
+        map.removeLayer(marker);
+      }
+    });
+
+    markersRef.current = {};
+
+    // Add waypoint markers
+    waypoints.forEach((waypoint, index) => {
+      const isHovered = waypoint.id === hoveredMarker;
+      const marker = L.marker(waypoint.latlng, {
+        icon: createCustomIcon(isHovered),
+        title: `Point ${index + 1}`
+      })
+        .addTo(map)
+        .bindPopup(`<b>Point ${index + 1}</b><br>${waypoint.address}`);
+
+      markersRef.current[waypoint.id] = marker;
+    });
+  }, [map, waypoints, hoveredMarker]);
+
+  // Separate effect for updating POI markers
+  useEffect(() => {
+    if (!map || !locationInfo) return;
+
+    console.log("Updating POI markers...");
+
+    // Clear existing POI markers
+    Object.values(poiMarkersRef.current).forEach(marker => {
+      if (map.hasLayer(marker)) {
+        map.removeLayer(marker);
+      }
+    });
+
+    poiMarkersRef.current = {};
+
+    // Add POI markers
+    locationInfo.results.forEach((location, locationIndex) => {
+      if (location.placesToVisit) {
+        location.placesToVisit.forEach((place, placeIndex) => {
+          if (place.latlng) {
+            const markerKey = `${locationIndex}-${placeIndex}`;
+            const isSelected = selectedPlaceIndex &&
+              selectedPlaceIndex[0] === locationIndex &&
+              selectedPlaceIndex[1] === placeIndex;
+
+            const marker = L.marker(place.latlng, {
+              icon: createCustomIcon(isSelected, true),
+              title: place.name
+            })
+              .addTo(map)
+              .bindPopup(`<b>${place.name}</b><br>${place.address}<br>${place.paid === "Yes" ? "Paid" : "Free"}`);
+
+            poiMarkersRef.current[markerKey] = marker;
+          }
+        });
+      }
+    });
+  }, [map, locationInfo]);
+
+  // Separate effect for handling POI marker selection states
+  useEffect(() => {
+    if (!map || !locationInfo) return;
+
+    // Update POI marker icons based on selection state
+    locationInfo.results.forEach((location, locationIndex) => {
+      if (location.placesToVisit) {
+        location.placesToVisit.forEach((place, placeIndex) => {
+          const markerKey = `${locationIndex}-${placeIndex}`;
+          const marker = poiMarkersRef.current[markerKey];
+
+          if (marker) {
+            const isSelected = selectedPlaceIndex &&
+              selectedPlaceIndex[0] === locationIndex &&
+              selectedPlaceIndex[1] === placeIndex;
+
+            marker.setIcon(createCustomIcon(isSelected, true));
+          }
+        });
+      }
+    });
+  }, [map, locationInfo, selectedPlaceIndex]);
 
   // Remove a specific waypoint
   const removeWaypoint = (id: string) => {
     setWaypoints(prev => prev.filter(wp => wp.id !== id));
-    console.log(`Removed waypoint ${id}`);
+    // Mark route as needing update
+    isRouteInitializedRef.current = false;
   };
 
   // Clear all waypoints
   const clearWaypoints = () => {
     setWaypoints([]);
     setLocationInfo(null);
-
-    if (map && routingControlRef.current) {
-      map.removeControl(routingControlRef.current);
-      routingControlRef.current = null;
-      setRouteSummary(null);
-    }
-
+    setRouteSummary(null);
+    clearMapObjects();
     console.log("All waypoints cleared");
   };
 
-
-  console.log(waypoints)
   // Reset to the last two waypoints (for creating a simple A to B route)
   const resetToSimpleRoute = () => {
     if (waypoints.length >= 2) {
       const start = waypoints[0];
       const end = waypoints[waypoints.length - 1];
       setWaypoints([start, end]);
+      // Mark route as needing update
+      isRouteInitializedRef.current = false;
       console.log("Reset to simple A-B route");
     }
   };
@@ -455,14 +630,12 @@ const MapComponent: React.FC = () => {
           updatedResults[i].waypoint = waypoints[i];
         }
 
-        console.log("Geocoding places to visit for:", updatedResults[i].address);
         // Geocode each place to visit
         if (updatedResults[i].placesToVisit && updatedResults[i].placesToVisit.length > 0) {
           for (let j = 0; j < updatedResults[i].placesToVisit.length; j++) {
             const place = updatedResults[i].placesToVisit[j];
             if (place.address) {
               const latlng = await geocodeAddress(place.address);
-              console.log("Geocoded place:", place.name, "to", latlng);
               if (latlng) {
                 updatedResults[i].placesToVisit[j] = {
                   ...place,
@@ -486,44 +659,6 @@ const MapComponent: React.FC = () => {
     }
   };
 
-  // Add POI markers to the map
-  const addPOIMarkers = useEffect(() => {
-    if (!map || !locationInfo) return;
-
-    // Clear existing POI markers
-    poiMarkersRef.current.forEach(marker => {
-      map.removeLayer(marker);
-    });
-    poiMarkersRef.current = [];
-
-    // Add new POI markers
-    locationInfo.results.forEach((location, locationIndex) => {
-      if (location.placesToVisit) {
-        location.placesToVisit.forEach((place, placeIndex) => {
-          if (place.latlng) {
-            const isSelected = selectedPlaceIndex &&
-              selectedPlaceIndex[0] === locationIndex &&
-              selectedPlaceIndex[1] === placeIndex;
-
-            const marker = L.marker(place.latlng, {
-              icon: createCustomIcon(isSelected, true),
-              title: place.name
-            })
-              .addTo(map)
-              .bindPopup(`
-                <b>${place.name}</b><br>
-                ${place.address}<br>
-                <small>${place.paid === "Yes" ? "🎫 Paid" : "✓ Free"}</small><br>
-                <small>${place.context}</small>
-              `);
-
-            poiMarkersRef.current.push(marker);
-          }
-        });
-      }
-    });
-  }, [map, locationInfo, selectedPlaceIndex]);
-
   // Finish button handler - now with OpenAI API integration and geocoding for places
   const handleFinish = async () => {
     if (waypoints.length < 2) {
@@ -533,11 +668,6 @@ const MapComponent: React.FC = () => {
 
     setIsSaving(true);
     setIsLoading(true);
-
-    console.log("Processing itinerary with waypoints:");
-    waypoints.forEach((waypoint, index) => {
-      console.log(`Point ${index + 1}: ${waypoint.address} [${waypoint.latlng.lat.toFixed(6)}, ${waypoint.latlng.lng.toFixed(6)}]`);
-    });
 
     try {
       // Extract addresses from waypoints for OpenAI API
@@ -567,7 +697,9 @@ const MapComponent: React.FC = () => {
 
       // Store the enhanced OpenAI response in state
       setLocationInfo(result);
-      
+
+      // Important: Don't touch the route when setting location info
+      // We don't want to recalculate the route just because we got places to visit
 
     } catch (error) {
       console.error("Error processing itinerary:", error);
@@ -578,8 +710,7 @@ const MapComponent: React.FC = () => {
     }
   };
 
-
-  const saveResponse = async () => {
+  const saveRoute = async () => {
     if (!user) {
       alert("You need to be logged in to save the itinerary");
       return;
@@ -588,11 +719,11 @@ const MapComponent: React.FC = () => {
       alert("You need at least 2 points and location information to save the itinerary");
       return;
     }
-  
+
     setIsSaving(true);
-  
+
     try {
-      // Préparer les waypoints pour l'API
+      // Prepare waypoints for the API
       const serializedWaypoints = waypoints.map(wp => ({
         id: wp.id,
         latlng: {
@@ -602,37 +733,37 @@ const MapComponent: React.FC = () => {
         address: wp.address
       }));
 
-      // Envoyer les waypoints et les informations de localisation à l'API
+      // Send waypoints and location information to the API
       const response = await fetch('/api/routes/save', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        waypoints: serializedWaypoints,
-        locationInfo: locationInfo,
-        userId: user.id,
-        name: `Itinéraire du ${new Date().toLocaleDateString()}`
-      }),
-    });
-  
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          waypoints: serializedWaypoints,
+          locationInfo: locationInfo,
+          userId: user.id,
+          name: `Itinerary ${new Date().toLocaleDateString()}`
+        }),
+      });
+
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Échec de la sauvegarde de l\'itinéraire');
+        throw new Error(errorData.error || 'Failed to save the itinerary');
       }
-  
+
       const result = await response.json();
-      console.log("Itinéraire et informations enregistrés avec succès:", result);
-  
-      alert("Itinéraire et informations de lieux enregistrés avec succès!");
+      console.log("Itinerary and information saved successfully:", result);
+
+      alert("Itinerary and location information saved successfully!");
     } catch (error) {
-      console.error("Erreur lors de l'enregistrement:", error);
-      alert(`Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+      console.error("Error saving:", error);
+      alert(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsSaving(false);
     }
   };
-  
+
   return (
     <div className="relative w-full h-full flex">
       {/* Left sidebar for location information */}
@@ -718,29 +849,29 @@ const MapComponent: React.FC = () => {
             <Trash2 className="mr-2 h-4 w-4" />
             Clear All Points
           </Button>
-          
-          {/* Afficher le bouton uniquement si l'array n'est pas vide */}
-          {setLocationInfo && waypoints.length > 0 && (
+
+          {/* Show save button only if we have location info */}
+          {locationInfo && waypoints.length > 0 && (
             <Button
-            variant="outline"
-            onClick={saveResponse}
-            className="flex items-center bg-blue-600 text-white hover:bg-blue-700 shadow-lg"
-            disabled={isLoading || isSaving || !locationInfo}
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Sauvegarde...
-              </>
-            ) : (
-              <>
-                <Save className="mr-2 h-4 w-4" />
-                Enregistrer l'itinéraire
-              </>
-            )}
-          </Button>
+              variant="outline"
+              onClick={saveRoute}
+              className="flex items-center bg-black text-white hover:text-white hover:bg-black/80 shadow-lg"
+              disabled={isLoading || isSaving || !locationInfo}
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Route
+                </>
+              )}
+            </Button>
           )}
-         
+
           <Button
             variant="outline"
             onClick={resetToSimpleRoute}
@@ -752,32 +883,48 @@ const MapComponent: React.FC = () => {
           </Button>
         </div>
 
-        {/* Finish button in top right */}
-        {waypoints.length > 0 && (
-          <Button
-            variant="default"
-            onClick={handleFinish}
-            className="absolute top-4 right-4 z-10 shadow-lg bg-green-600 hover:bg-green-700 text-white flex items-center"
-            disabled={isSaving || isLoading}
-          >
-            {isSaving || isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {locationInfo ? "Loading..." : "Processing..."}
-              </>
-            ) : locationInfo ? (
-              <>
-                <Info className="mr-2 h-4 w-4" />
-                Update Information
-              </>
-            ) : (
-              <>
-                <Check className="mr-2 h-4 w-4" />
-                Get Location Info
-              </>
-            )}
-          </Button>
-        )}
+        {/* Top right buttons */}
+        <div className="absolute top-4 right-4 z-10 flex flex-col space-y-2">
+          {/* My Routes Button */}
+          {user && (
+            <Button
+              variant="outline"
+              onClick={() => setIsRoutesModalOpen(true)}
+              className="shadow-lg bg-black text-white hover:text-white hover:bg-black/80 flex items-center"
+              disabled={isLoading || isSaving}
+            >
+              <Map className="mr-2 h-4 w-4" />
+              My Routes
+            </Button>
+          )}
+
+          {/* Get Location Info Button */}
+          {waypoints.length > 0 && (
+            <Button
+              variant="default"
+              onClick={handleFinish}
+              className="shadow-lg bg-black hover:bg-black/80 text-white hover:text-white flex items-center"
+              disabled={isSaving || isLoading}
+            >
+              {isSaving || isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {locationInfo ? "Loading..." : "Processing..."}
+                </>
+              ) : locationInfo ? (
+                <>
+                  <Info className="mr-2 h-4 w-4" />
+                  Update Information
+                </>
+              ) : (
+                <>
+                  <Check className="mr-2 h-4 w-4" />
+                  Get Location Info
+                </>
+              )}
+            </Button>
+          )}
+        </div>
 
         {/* Route summary box in bottom center */}
         {routeSummary && (
@@ -861,6 +1008,13 @@ const MapComponent: React.FC = () => {
           </Card>
         </div>
       )}
+
+      <RoutesModal
+        isOpen={isRoutesModalOpen}
+        onClose={() => setIsRoutesModalOpen(false)}
+        onLoadRoute={loadRoute}
+        user={user}
+      />
     </div>
   );
 };

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import OpenAIService from "@/services/openaiService";
 
 export default function OpenAISearch() {
   const [result, setResult] = useState<any>(null);
@@ -82,7 +81,7 @@ export default function OpenAISearch() {
             Ajouter
           </button>
         </div>
-        
+
         {addresses.length > 0 && (
           <div className="mt-2">
             <h3 className="text-md font-semibold mb-2">Adresses à analyser :</h3>
@@ -90,7 +89,7 @@ export default function OpenAISearch() {
               {addresses.map((address, index) => (
                 <li key={index} className="flex justify-between items-center py-1">
                   <span>{address}</span>
-                  <button 
+                  <button
                     onClick={() => removeAddress(index)}
                     className="text-red-500 hover:text-red-700"
                   >
@@ -101,7 +100,7 @@ export default function OpenAISearch() {
             </ul>
           </div>
         )}
-        
+
         {error && <p className="text-red-500 text-sm">{error}</p>}
         <button
           onClick={handleSearch}

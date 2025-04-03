@@ -39,11 +39,11 @@ export default function RegisterPage() {
         <Input placeholder="Password" type="password" {...register("password")} />
         {errors.password && <p className="text-sm text-red-500">{errors.password.message}</p>}
 
-        <Button type="submit" className="w-full">S'inscrire</Button>
+        <Button type="submit" className="w-full">Sign Up</Button>
 
         {error && <p className="text-sm text-red-500">{error}</p>}
         <p className="text-sm text-center">
-          Déjà un compte ? <span className="text-blue-600 cursor-pointer" onClick={() => router.push("/login")}>Connexion</span>
+          Already have an account? <span className="text-blue-600 cursor-pointer" onClick={() => router.push("/login")}>Log In</span>
         </p>
       </form>
     </div>

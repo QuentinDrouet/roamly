@@ -2,6 +2,7 @@ import { supabase } from "@/utils/supabase/client"
 
 export const loginWithEmail = async (email: string, password: string) => {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+  if (data.session) await supabase.auth.setSession(data.session)
   if (error) throw error
   return data
 }
