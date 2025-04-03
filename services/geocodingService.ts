@@ -51,6 +51,31 @@ export class GeocodingService {
   }
 
   /**
+   * Call Nominatim API directly to get coordinates from address
+   * This method is called by the API endpoint
+   */
+  static async callNominatimForwardGeocode(address: string): Promise<any> {
+    // Encode the address properly for URL
+    const encodedAddress = encodeURIComponent(address);
+
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=1&addressdetails=1`,
+      {
+        headers: {
+          'User-Agent': 'YourAppName/1.0 (your@email.com)', // Change this to your app info
+          'Accept-Language': 'en', // You can customize the language
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Nominatim API error: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  /**
    * Reverse geocode a lat/lng position to an address
    * Using OpenStreetMap's Nominatim service
    */
@@ -74,6 +99,44 @@ export class GeocodingService {
     } catch (error) {
       console.error('Reverse geocoding error:', error);
       return `${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`;
+    }
+  }
+
+  /**
+   * Forward geocode an address to lat/lng coordinates
+   * Using OpenStreetMap's Nominatim service
+   */
+  static async forwardGeocode(address: string): Promise<LatLng | null> {
+    try {
+      // Encode the address properly for URL
+      const encodedAddress = encodeURIComponent(address);
+
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodedAddress}&limit=1`,
+        {
+          headers: {
+            'User-Agent': 'YourAppName/1.0 (your@email.com)', // Recommended by Nominatim
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data && data.length > 0) {
+        return {
+          lat: parseFloat(data[0].lat),
+          lng: parseFloat(data[0].lon)
+        };
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Forward geocoding error:', error);
+      return null;
     }
   }
 

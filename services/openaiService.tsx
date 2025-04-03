@@ -40,11 +40,11 @@ class OpenAIService {
         apiKey: apiKey
       });
     }
-  
+
     try {
       // Prepare the query to include all addresses
       const addressListText = addresses.map(addr => `- ${addr}`).join('\n');
-      
+
       const response = await this.client.chat.completions.create({
         model: "gpt-4o-mini",
         response_format: { type: "json_object" },
@@ -63,13 +63,13 @@ class OpenAIService {
                   "placesToVisit": [
                     {
                       "name": "Name of the first place to visit",
-                      "address": "Precise address or location",
+                      "address": "number, street, zip code, country",
                       "context": "Description of what can be done, seen or experienced there",
                       "paid": "Yes/No/Price (leave empty if unknown)"
                     },
                     {
                       "name": "Name of the second place",
-                      "address": "Precise address or location",
+                      "address": "number, street, zip code, country",
                       "context": "Description of what can be done, seen or experienced there",
                       "paid": "Yes/No/Price (leave empty if unknown)"
                     }
@@ -92,7 +92,7 @@ class OpenAIService {
         ],
         temperature: 0.4
       });
-  
+
       if (response.choices[0].message.content) {
         try {
           return JSON.parse(response.choices[0].message.content);
@@ -101,7 +101,7 @@ class OpenAIService {
           return response.choices[0].message.content;
         }
       }
-      
+
       return response.choices[0].message;
     } catch (error) {
       console.error("OpenAI error:", error);
