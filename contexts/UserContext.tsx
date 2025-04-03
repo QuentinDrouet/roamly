@@ -3,7 +3,7 @@
 
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
 import { supabase } from '@/utils/supabase/client';
-import { User } from '@supabase/supabase-js';
+import {User} from "@supabase/auth-js";
 
 interface UserContextType {
   user: User | null;
@@ -24,11 +24,11 @@ export function UserProvider({ children }: { children: ReactNode }) {
     try {
       setLoading(true);
       const { data, error } = await supabase.auth.getUser();
-      
+
       if (error) {
         throw error;
       }
-      
+
       setUser(data.user);
     } catch (err) {
       setError(err instanceof Error ? err : new Error('An unknown error occurred'));
