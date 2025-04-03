@@ -17,7 +17,6 @@ export default function AuthActions() {
     <div className="flex items-center gap-2"> 
       {user ? (
         <div className="flex items-center gap-2">
-          <span className="text-sm hidden md:inline">{user.email}</span>
           <Button variant="outline" onClick={handleLogout}>Se déconnecter</Button>
         </div>
       ) : (
