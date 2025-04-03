@@ -1,37 +1,109 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🌍 Roamly
 
-## Getting Started
+**Roamly** is a modern travel planning web app that helps you create your ideal trip by placing points on a map, generating routes, and discovering activities and places to visit along the way.
 
-First, run the development server:
+<img width="1726" alt="image" src="https://github.com/user-attachments/assets/642f2023-3892-428e-9b11-304780f90033" />
+
+## 🚀 Features
+
+- 🗺️ Interactive map with **Leaflet** & **OpenStreetMap**
+- 📍 Add waypoints and visualize your route
+- 🔍 Discover activities and places between each stop (via **GPT 4o Mini** API)
+- ✅ Auth system with **Supabase**
+- 🧾 Trip saving in Supabase database (routes, waypoints, etc.)
+- 🎨 Built with **Next.js 15**, **Tailwind CSS**, **shadcn/ui**
+- 📦 Validated forms using **Zod**
+- 🧪 Unit tests with **Jest**
+- ⚙️ CI with **GitHub Actions**
+- ☁️ Deployed on **Vercel**
+
+## 🧑‍💻 Tech Stack
+
+| Tech             | Purpose                          |
+|------------------|----------------------------------|
+| Next.js 15       | App framework (App Router)       |
+| Tailwind CSS     | Utility-first styling            |
+| shadcn/ui        | Beautiful & accessible UI        |
+| Zod              | Schema validation                |
+| Supabase         | Auth & PostgreSQL database       |
+| Leaflet          | Interactive maps                 |
+| OpenStreetMap    | Free map data                    |
+| GPT 4o Mini API  | Activity/location suggestions    |
+| Jest             | Unit testing                     |
+| GitHub Actions   | CI/CD pipelines                  |
+| Vercel           | Deployment                       |
+
+## 🗃️ Database Structure
+
+Supabase table: `routes`
+
+| Column       | Type    | Description                              |
+|--------------|---------|------------------------------------------|
+| `id`         | UUID    | Unique route ID                          |
+| `name`       | String  | Name of the trip                         |
+| `locationInfo` | JSON | Metadata for route locations              |
+| `waypoints`  | JSON    | List of coordinates and points           |
+| `user_id`    | UUID    | Reference to the authenticated user      |
+| `created_at` | Date    | Timestamp of creation                    |
+
+## 🔐 Authentication
+
+- Supabase handles user authentication and session management.
+- SSR and client-side authenticated routes are supported.
+
+## 🧪 Testing & CI
+
+- Written with **Jest**
+- **GitHub Actions** pipeline runs tests on push/PR
+
+## 🌐 Deployment
+
+Roamly is deployed on **[Vercel](https://roamly-theta.vercel.app/)**.
+
+## 📦 Installation
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+# Clone the repo
+git clone https://github.com/your-username/roamly.git
+cd roamly
+
+# Install dependencies
+pnpm install
+
+# Run the development server
 pnpm dev
-# or
-bun dev
 ```
+env structure
+```bash
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+OPEN_API_KEY=
+```
+## 🤝 Contributing
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Contributions are welcome!  
+If you have ideas for new features, improvements, or bug fixes, feel free to open an issue or submit a pull request.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Before contributing, please:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Fork the repository
+- Create a new branch (`git checkout -b feature/your-feature-name`)
+- Commit your changes (`git commit -m 'Add feature'`)
+- Push to the branch (`git push origin feature/your-feature-name`)
+- Open a Pull Request
 
-## Learn More
+Please make sure to follow the existing code style and structure.
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 📄 License
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+This project is licensed under the [MIT License](LICENSE).
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Made with 💙 by Quentin Drouet, Edgar Lecomte and Romain Malaterre
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-# roamly
+
+
+
