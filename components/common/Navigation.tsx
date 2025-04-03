@@ -7,17 +7,17 @@ import { useUser } from "@/contexts/UserContext";
 
 const Navigation = () => {
   const pathname = usePathname();
-  const { user, loading } = useUser();
-  
+  const { user } = useUser();
+
   const StatusIndicator = () => (
     <div className="flex items-center">
-      <div 
+      <div
         className={`w-3 h-3 rounded-full ${user ? 'bg-green-500' : 'bg-red-500'} animate-pulse`}
         title={user ? 'Connecté' : 'Déconnecté'}
       />
     </div>
   );
-  
+
   return (
     <header className="sticky top-0 z-50 w-full border-b border-gray-100 bg-white/80 backdrop-blur-md">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
@@ -28,10 +28,12 @@ const Navigation = () => {
             </span>
           </Link>
         </div>
-        
-        <div className="flex items-center gap-4">  
-          <AuthActions user={user} />
-          <StatusIndicator />
+
+        <div className="flex items-center gap-4">
+          <AuthActions />
+          {pathname !== "/login" && pathname !== "/register" && (
+            <StatusIndicator />
+          )}
         </div>
       </div>
     </header>

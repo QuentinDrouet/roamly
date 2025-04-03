@@ -1,4 +1,3 @@
-// services/routeService.ts
 import { supabase } from "@/utils/supabase/client";
 
 export interface WaypointDTO {
@@ -54,7 +53,7 @@ class RouteService {
     }
     return RouteService.instance;
   }
-  
+
 
   public async saveRouteWithInfo(
     waypoints: WaypointDTO[],
@@ -69,40 +68,34 @@ class RouteService {
       throw new Error("User ID is required");
     }
 
-    console.log(userId)
-  
-      const route: Route = {
+    const route: Route = {
       name: name || `Route ${new Date().toISOString()}`,
       waypoints,
       locationInfo,
       user_id: userId,
     };
-  
+
     const { data, error } = await this.supabase
       .from('routes')
       .insert(route)
       .select()
       .single();
-  
+
     if (error) {
       console.error("Error saving route with info to Supabase:", error);
       throw error;
     }
-  
+
     return data;
   }
 
 
-  public async getRoutes(): Promise<Route[]> {
-    // Récupérer l'utilisateur actuel
-    const { data: userData } = await this.supabase.auth.getUser();
-    const userId = userData?.user?.id;
-
+  public async getRoutes(userId:string): Promise<Route[]> {
     if (!userId) {
       throw new Error("User not authenticated");
     }
 
-    // Récupérer les routes de l'utilisateur depuis Supabase
+    // Fetch routes from Supabase
     const { data, error } = await this.supabase
       .from('routes')
       .select('*')
@@ -117,16 +110,12 @@ class RouteService {
     return data || [];
   }
 
-  public async getRouteById(id: string): Promise<Route | null> {
-    // Récupérer l'utilisateur actuel
-    const { data: userData } = await this.supabase.auth.getUser();
-    const userId = userData?.user?.id;
-
+  public async getRouteById(id: string, userId: string): Promise<Route | null> {
     if (!userId) {
       throw new Error("User not authenticated");
     }
 
-    // Récupérer la route spécifique depuis Supabase
+    // Fetch the route by ID from Supabase
     const { data, error } = await this.supabase
       .from('routes')
       .select('*')
@@ -142,16 +131,12 @@ class RouteService {
     return data;
   }
 
-  public async deleteRoute(id: string): Promise<boolean> {
-    // Récupérer l'utilisateur actuel
-    const { data: userData } = await this.supabase.auth.getUser();
-    const userId = userData?.user?.id;
-
+  public async deleteRoute(id: string, userId: string): Promise<boolean> {
     if (!userId) {
       throw new Error("User not authenticated");
     }
 
-    // Supprimer la route de Supabase
+    // Delete the route from Supabase
     const { error } = await this.supabase
       .from('routes')
       .delete()
